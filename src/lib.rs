@@ -9,6 +9,7 @@ use std::mem;
 
 use x11::xlib;
 
+/// A context, holding the internal data required to query a string
 pub enum Context {
     FontSet {
         display: *mut xlib::Display,
@@ -21,6 +22,10 @@ pub enum Context {
 }
 
 impl Context {
+    /// Creates a new context given by the font string given here.
+    ///
+    /// The font string should be of the X11 form, as selected by `fontsel`.
+    /// XFT is not supported!
     fn new(name: &str) -> Result<Context, failure::Error> {
         unsafe {
             let name : CString = CString::new(name)?;
@@ -79,6 +84,7 @@ impl Drop for Context {
     }
 }
 
+/// Get the width of the text rendered with the font specified by the context
 pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
     let text = CString::new(text.as_ref()).expect("Could not create cstring");
 
@@ -95,6 +101,16 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
                 return xlib::XTextWidth(xfont, text.as_ptr(), text.as_bytes().len() as i32) as u64;
             }
         }
+    }
+}
+
+/// Sets up xlib to be multithreaded
+///
+/// Make sure you call this before doing __anything__ else xlib related.
+/// Also, do not call this more than once preferably
+pub fn setup_multithreading() {
+    unsafe {
+        xlib::XInitThreads();
     }
 }
 
