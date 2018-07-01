@@ -3,14 +3,12 @@ extern crate x11;
 
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
-use std::slice;
 use std::ptr;
 use std::mem;
 
 use x11::xlib;
 
-/// A context, holding the internal data required to query a string
-pub enum Context {
+enum Data {
     FontSet {
         display: *mut xlib::Display,
         fontset: xlib::XFontSet,
@@ -21,12 +19,17 @@ pub enum Context {
     }
 }
 
+/// A context, holding the internal data required to query a string
+pub struct Context {
+    data: Data,
+}
+
 impl Context {
     /// Creates a new context given by the font string given here.
     ///
     /// The font string should be of the X11 form, as selected by `fontsel`.
     /// XFT is not supported!
-    fn new(name: &str) -> Result<Context, failure::Error> {
+    pub fn new(name: &str) -> Result<Context, failure::Error> {
         unsafe {
             let name : CString = CString::new(name)?;
 
@@ -46,9 +49,11 @@ impl Context {
             }
 
             if !fontset.is_null() {
-                return Ok(Context::FontSet {
-                    display: dpy,
-                    fontset: fontset,
+                return Ok(Context {
+                    data: Data::FontSet {
+                        display: dpy,
+                        fontset: fontset,
+                    }
                 });
             } else {
                 let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
@@ -58,24 +63,31 @@ impl Context {
                     return Err(format_err!("Could not load font: {:?}", name))?;
                 }
 
-                return Ok(Context::XFont {
-                    display: dpy,
-                    xfont: xfont,
+                return Ok(Context {
+                    data: Data::XFont {
+                        display: dpy,
+                        xfont: xfont,
+                    }
                 });
             }
         }
+    }
+
+    /// Get text width for the given string
+    pub fn text_width<S: AsRef<str>>(&self, text: S) -> u64 {
+        get_text_width(&self, text)
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            match *self {
-                Context::FontSet { display, fontset } => {
+            match self.data {
+                Data::FontSet { display, fontset } => {
                     xlib::XFreeFontSet(display, fontset);
                     xlib::XCloseDisplay(display);
                 }
-                Context::XFont { display, xfont } => {
+                Data::XFont { display, xfont } => {
                     xlib::XFreeFont(display, xfont);
                     xlib::XCloseDisplay(display);
                 }
@@ -90,14 +102,14 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
 
     unsafe {
 
-        match *ctx {
-            Context::FontSet { display, fontset } => {
+        match ctx.data {
+            Data::FontSet { fontset, .. } => {
                 let mut r = mem::uninitialized();
                 xlib::XmbTextExtents(fontset, text.as_ptr(),
                                      text.as_bytes().len() as i32, ptr::null_mut(), &mut r);
                 return r.width as u64;
             }
-            Context::XFont { xfont, .. } => {
+            Data::XFont { xfont, .. } => {
                 return xlib::XTextWidth(xfont, text.as_ptr(), text.as_bytes().len() as i32) as u64;
             }
         }
