@@ -49,6 +49,7 @@ impl Context {
                 let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
 
                 if xfont.is_null() {
+                    xlib::XCloseDisplay(dpy);
                     return Err(format_err!("Could not load font: {:?}", name))?;
                 }
 
@@ -100,15 +101,31 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
 #[cfg(test)]
 mod test {
     use super::{Context, get_text_width};
+    use std::sync::{Once, ONCE_INIT};
+    use x11::xlib;
+
+    static SETUP: Once = ONCE_INIT;
+
+    // THIS MUST BE CALLED AT THE BEGINNING OF EACH TEST TO MAKE SURE THAT IT IS THREAD-SAFE!!!
+    fn setup() {
+        SETUP.call_once(|| {
+            unsafe {
+                xlib::XInitThreads();
+            }
+        })
+    }
+
 
     #[test]
     fn test_context_new() {
+        setup();
         let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*");
         assert!(ctx.is_ok());
     }
 
     #[test]
     fn test_context_drop() {
+        setup();
         let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*");
         drop(ctx);
         assert!(true);
@@ -116,9 +133,16 @@ mod test {
 
     #[test]
     fn test_text_width() {
+        setup();
         let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*").unwrap();
 
         assert!(get_text_width(&ctx, "Hello World") > 0);
     }
 
+    #[test]
+    fn test_text_alternate() {
+        setup();
+        let ctx = Context::new("basdkladslk");
+        assert!(ctx.is_err());
+    }
 }
