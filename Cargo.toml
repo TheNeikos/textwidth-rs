@@ -1,7 +1,10 @@
 [package]
 authors = ["Marcel Müller <neikos@neikos.email>"]
-name = "textwidth-rs"
-version = "0.1.0"
+name = "textwidth"
+version = "1.0.0"
+description = "Get the width of a piece of text for a font through xlib"
+license = "MIT"
+
 
 [dependencies]
 failure = "0.1.1"
