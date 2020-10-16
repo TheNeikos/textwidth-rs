@@ -1,10 +1,11 @@
 extern crate x11;
-#[macro_use] extern crate failure;
+#[macro_use]
+extern crate failure;
 
 use std::ffi::CString;
+use std::mem;
 use std::os::raw::{c_char, c_int};
 use std::ptr;
-use std::mem;
 
 use x11::xlib;
 
@@ -16,7 +17,7 @@ enum Data {
     XFont {
         display: *mut xlib::Display,
         xfont: *mut xlib::XFontStruct,
-    }
+    },
 }
 
 /// A context, holding the internal data required to query a string
@@ -31,7 +32,7 @@ impl Context {
     /// XFT is not supported!
     pub fn new(name: &str) -> Result<Context, failure::Error> {
         unsafe {
-            let name : CString = CString::new(name)?;
+            let name: CString = CString::new(name)?;
 
             let dpy = xlib::XOpenDisplay(ptr::null());
             if dpy.is_null() {
@@ -40,9 +41,13 @@ impl Context {
 
             let missing_ptr: *mut *mut c_char = mem::uninitialized();
             let missing_len: *mut c_int = mem::uninitialized();
-            let fontset = xlib::XCreateFontSet(dpy, name.as_ptr(),
-                                        mem::transmute(&missing_ptr), mem::transmute(&missing_len),
-                                        ptr::null_mut());
+            let fontset = xlib::XCreateFontSet(
+                dpy,
+                name.as_ptr(),
+                mem::transmute(&missing_ptr),
+                mem::transmute(&missing_len),
+                ptr::null_mut(),
+            );
 
             if !missing_ptr.is_null() {
                 xlib::XFreeStringList(missing_ptr);
@@ -53,7 +58,7 @@ impl Context {
                     data: Data::FontSet {
                         display: dpy,
                         fontset: fontset,
-                    }
+                    },
                 });
             } else {
                 let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
@@ -67,7 +72,7 @@ impl Context {
                     data: Data::XFont {
                         display: dpy,
                         xfont: xfont,
-                    }
+                    },
                 });
             }
         }
@@ -101,12 +106,16 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
     let text = CString::new(text.as_ref()).expect("Could not create cstring");
 
     unsafe {
-
         match ctx.data {
             Data::FontSet { fontset, .. } => {
                 let mut r = mem::uninitialized();
-                xlib::XmbTextExtents(fontset, text.as_ptr(),
-                                     text.as_bytes().len() as i32, ptr::null_mut(), &mut r);
+                xlib::XmbTextExtents(
+                    fontset,
+                    text.as_ptr(),
+                    text.as_bytes().len() as i32,
+                    ptr::null_mut(),
+                    &mut r,
+                );
                 return r.width as u64;
             }
             Data::XFont { xfont, .. } => {
@@ -128,7 +137,7 @@ pub fn setup_multithreading() {
 
 #[cfg(test)]
 mod test {
-    use super::{Context, get_text_width};
+    use super::{get_text_width, Context};
     use std::sync::{Once, ONCE_INIT};
     use x11::xlib;
 
@@ -136,13 +145,10 @@ mod test {
 
     // THIS MUST BE CALLED AT THE BEGINNING OF EACH TEST TO MAKE SURE THAT IT IS THREAD-SAFE!!!
     fn setup() {
-        SETUP.call_once(|| {
-            unsafe {
-                xlib::XInitThreads();
-            }
+        SETUP.call_once(|| unsafe {
+            xlib::XInitThreads();
         })
     }
-
 
     #[test]
     fn test_context_new() {
