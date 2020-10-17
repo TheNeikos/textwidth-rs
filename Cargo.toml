@@ -6,6 +6,5 @@ authors = ["Marcel Müller <neikos@neikos.email>"]
 license = "MIT"
 edition = "2018"
 
-[dependencies.x11]
-version = "2.18.0"
-features = ["xlib"]
+[dependencies]
+x11 = { version = "2.18.2", features = ["xlib"] }
