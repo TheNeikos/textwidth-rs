@@ -3,7 +3,7 @@ extern crate x11;
 use std::error::Error;
 use std::ffi::CString;
 use std::fmt;
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::os::raw::{c_char, c_int};
 use std::ptr;
 use x11::xlib;
@@ -49,8 +49,8 @@ impl Context {
                 return Err(Box::new(XError("Could not open display".into())));
             }
 
-            let missing_ptr: *mut *mut c_char = mem::uninitialized();
-            let missing_len: *mut c_int = mem::uninitialized();
+            let missing_ptr: *mut *mut c_char = MaybeUninit::uninit().assume_init();
+            let missing_len: *mut c_int = MaybeUninit::uninit().assume_init();
             let fontset = xlib::XCreateFontSet(
                 dpy,
                 name.as_ptr(),
@@ -118,7 +118,7 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
     unsafe {
         match ctx.data {
             Data::FontSet { fontset, .. } => {
-                let mut r = mem::uninitialized();
+                let mut r = MaybeUninit::uninit().assume_init();
                 xlib::XmbTextExtents(
                     fontset,
                     text.as_ptr(),
@@ -148,10 +148,10 @@ pub fn setup_multithreading() {
 #[cfg(test)]
 mod test {
     use super::{get_text_width, Context};
-    use std::sync::{Once, ONCE_INIT};
+    use std::sync::Once;
     use x11::xlib;
 
-    static SETUP: Once = ONCE_INIT;
+    static SETUP: Once = Once::new();
 
     // THIS MUST BE CALLED AT THE BEGINNING OF EACH TEST TO MAKE SURE THAT IT IS THREAD-SAFE!!!
     fn setup() {
