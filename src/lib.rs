@@ -8,6 +8,7 @@ use std::os::raw::{c_char, c_int};
 use std::ptr;
 use x11::xlib;
 
+/// XError holds the X11 error message
 #[derive(Debug)]
 struct XError(String);
 
@@ -175,7 +176,6 @@ mod test {
 	fn test_text_width() {
 		setup();
 		let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*").unwrap();
-
 		assert!(get_text_width(&ctx, "Hello World") > 0);
 	}
 	#[test]
