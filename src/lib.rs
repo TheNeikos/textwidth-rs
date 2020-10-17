@@ -41,7 +41,7 @@ impl Context {
 	///
 	/// The font string should be of the X11 form, as selected by `fontsel`.
 	/// XFT is not supported!
-	pub fn new(name: &str) -> Result<Context, Box<dyn Error>> {
+	pub fn new(name: &str) -> Result<Self, Box<dyn Error>> {
 		unsafe {
 			let name: CString = CString::new(name)?;
 			let dpy = xlib::XOpenDisplay(ptr::null());
@@ -85,6 +85,13 @@ impl Context {
 				});
 			}
 		}
+	}
+
+	/// Creates a new context with the misc-fixed font.
+	pub fn with_misc() -> Result<Self, Box<dyn Error>> {
+		Self::new(
+			"-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*",
+        )
 	}
 
 	/// Get text width for the given string
@@ -162,26 +169,26 @@ mod test {
 	#[test]
 	fn test_context_new() {
 		setup();
-		let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*");
+		let ctx = Context::with_misc();
 		assert!(ctx.is_ok());
 	}
 	#[test]
 	fn test_context_drop() {
 		setup();
-		let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*");
+		let ctx = Context::with_misc();
 		drop(ctx);
 		assert!(true);
 	}
 	#[test]
 	fn test_text_width() {
 		setup();
-		let ctx = Context::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*").unwrap();
+		let ctx = Context::with_misc().unwrap();
 		assert!(get_text_width(&ctx, "Hello World") > 0);
 	}
 	#[test]
 	fn test_text_alternate() {
 		setup();
-		let ctx = Context::new("basdkladslk");
+		let ctx = Context::new("?");
 		assert!(ctx.is_err());
 	}
 }
