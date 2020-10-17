@@ -1,13 +1,23 @@
 extern crate x11;
-#[macro_use]
-extern crate failure;
 
+use std::error::Error;
 use std::ffi::CString;
+use std::fmt;
 use std::mem;
 use std::os::raw::{c_char, c_int};
 use std::ptr;
-
 use x11::xlib;
+
+#[derive(Debug)]
+struct XError(String);
+
+impl fmt::Display for XError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "X Error: {}", self.0)
+    }
+}
+
+impl Error for XError {}
 
 enum Data {
     FontSet {
@@ -30,13 +40,13 @@ impl Context {
     ///
     /// The font string should be of the X11 form, as selected by `fontsel`.
     /// XFT is not supported!
-    pub fn new(name: &str) -> Result<Context, failure::Error> {
+    pub fn new(name: &str) -> Result<Context, Box<dyn Error>> {
         unsafe {
             let name: CString = CString::new(name)?;
 
             let dpy = xlib::XOpenDisplay(ptr::null());
             if dpy.is_null() {
-                return Err(format_err!("Could not open display"));
+                return Err(Box::new(XError("Could not open display".into())));
             }
 
             let missing_ptr: *mut *mut c_char = mem::uninitialized();
@@ -65,7 +75,7 @@ impl Context {
 
                 if xfont.is_null() {
                     xlib::XCloseDisplay(dpy);
-                    return Err(format_err!("Could not load font: {:?}", name))?;
+                    return Err(Box::new(XError(format!("Could not load font: {:?}", name))))?;
                 }
 
                 return Ok(Context {
