@@ -3,8 +3,7 @@ extern crate x11;
 use std::error::Error;
 use std::ffi::CString;
 use std::fmt;
-use std::mem::{self, MaybeUninit};
-use std::os::raw::{c_char, c_int};
+use std::mem::MaybeUninit;
 use std::ptr;
 use x11::xlib;
 
@@ -48,50 +47,48 @@ impl Context {
 			if dpy.is_null() {
 				return Err(Box::new(XError("Could not open display".into())));
 			}
-			let missing_ptr: *mut *mut c_char =
-				MaybeUninit::uninit().assume_init();
-			let missing_len: *mut c_int = MaybeUninit::uninit().assume_init();
+			let mut missing_ptr = MaybeUninit::uninit();
+			let mut missing_len = MaybeUninit::uninit();
 			let fontset = xlib::XCreateFontSet(
 				dpy,
 				name.as_ptr(),
-				mem::transmute(&missing_ptr),
-				mem::transmute(&missing_len),
+				missing_ptr.as_mut_ptr(),
+				missing_len.as_mut_ptr(),
 				ptr::null_mut(),
 			);
-			if !missing_ptr.is_null() {
-				xlib::XFreeStringList(missing_ptr);
+			if !missing_ptr.assume_init().is_null() {
+				xlib::XFreeStringList(missing_ptr.assume_init());
 			}
 			if !fontset.is_null() {
-				return Ok(Context {
+				Ok(Context {
 					data: Data::FontSet {
 						display: dpy,
 						fontset,
 					},
-				});
+				})
 			} else {
 				let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
 				if xfont.is_null() {
 					xlib::XCloseDisplay(dpy);
-					return Err(Box::new(XError(format!(
+					Err(Box::new(XError(format!(
 						"Could not load font: {:?}",
 						name
-					))))?;
+					))))
+				} else {
+					Ok(Context {
+						data: Data::XFont {
+							display: dpy,
+							xfont,
+						},
+					})
 				}
-				return Ok(Context {
-					data: Data::XFont {
-						display: dpy,
-						xfont,
-					},
-				});
 			}
 		}
 	}
 
 	/// Creates a new context with the misc-fixed font.
 	pub fn with_misc() -> Result<Self, Box<dyn Error>> {
-		Self::new(
-			"-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*",
-        )
+		Self::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*")
 	}
 
 	/// Get text width for the given string
@@ -119,27 +116,25 @@ impl Drop for Context {
 
 /// Get the width of the text rendered with the font specified by the context
 pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
-	let text = CString::new(text.as_ref()).expect("Could not create cstring");
+	let text = CString::new(text.as_ref()).expect("Could not create CString");
 	unsafe {
 		match ctx.data {
 			Data::FontSet { fontset, .. } => {
-				let mut r = MaybeUninit::uninit().assume_init();
+				let mut rectangle = MaybeUninit::uninit();
 				xlib::XmbTextExtents(
 					fontset,
 					text.as_ptr(),
 					text.as_bytes().len() as i32,
 					ptr::null_mut(),
-					&mut r,
+					rectangle.as_mut_ptr(),
 				);
-				return r.width as u64;
+				rectangle.assume_init().width as u64
 			}
-			Data::XFont { xfont, .. } => {
-				return xlib::XTextWidth(
-					xfont,
-					text.as_ptr(),
-					text.as_bytes().len() as i32,
-				) as u64;
-			}
+			Data::XFont { xfont, .. } => xlib::XTextWidth(
+				xfont,
+				text.as_ptr(),
+				text.as_bytes().len() as i32,
+			) as u64,
 		}
 	}
 }
