@@ -1,5 +1,3 @@
-extern crate x11;
-
 use std::error::Error;
 use std::ffi::CString;
 use std::fmt;
