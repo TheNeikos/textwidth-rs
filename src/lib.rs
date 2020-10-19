@@ -1,21 +1,19 @@
 use std::error::Error;
 use std::ffi::CString;
-use std::fmt;
 use std::mem::MaybeUninit;
 use std::ptr;
 use x11::xlib;
+use thiserror::Error;
 
 /// XError holds the X11 error message
-#[derive(Debug)]
-struct XError(String);
+#[derive(Debug, Error)]
+pub enum XError {
+    #[error("X Error: Could not open Display")]
+    DisplayOpen,
 
-impl fmt::Display for XError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "X Error: {}", self.0)
-    }
+    #[error("X Error: Could not open load Font {0:?}")]
+    CouldNotLoadFont(CString),
 }
-
-impl Error for XError {}
 
 enum Data {
     FontSet {
@@ -43,7 +41,7 @@ impl Context {
             let name: CString = CString::new(name)?;
             let dpy = xlib::XOpenDisplay(ptr::null());
             if dpy.is_null() {
-                return Err(Box::new(XError("Could not open display".into())));
+                return Err(Box::new(XError::DisplayOpen));
             }
             let mut missing_ptr = MaybeUninit::uninit();
             let mut missing_len = MaybeUninit::uninit();
@@ -68,7 +66,7 @@ impl Context {
                 let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
                 if xfont.is_null() {
                     xlib::XCloseDisplay(dpy);
-                    Err(Box::new(XError(format!("Could not load font: {:?}", name))))
+                    Err(Box::new(XError::CouldNotLoadFont(name)))
                 } else {
                     Ok(Context {
                         data: Data::XFont {
