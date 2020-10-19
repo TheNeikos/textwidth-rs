@@ -68,10 +68,7 @@ impl Context {
                 let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
                 if xfont.is_null() {
                     xlib::XCloseDisplay(dpy);
-                    Err(Box::new(XError(format!(
-                        "Could not load font: {:?}",
-                        name
-                    ))))
+                    Err(Box::new(XError(format!("Could not load font: {:?}", name))))
                 } else {
                     Ok(Context {
                         data: Data::XFont {
@@ -128,11 +125,9 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
                 );
                 rectangle.assume_init().width as u64
             }
-            Data::XFont { xfont, .. } => xlib::XTextWidth(
-                xfont,
-                text.as_ptr(),
-                text.as_bytes().len() as i32,
-            ) as u64,
+            Data::XFont { xfont, .. } => {
+                xlib::XTextWidth(xfont, text.as_ptr(), text.as_bytes().len() as i32) as u64
+            }
         }
     }
 }
