@@ -13,6 +13,7 @@ pub enum XError {
     #[error("X Error: Could not load font with name {0:?}")]
     CouldNotLoadFont(CString),
 
+    /// This error is returned when the string you pass 
     #[error("CStrings cannot hold NUL values")]
     NulError(#[from] std::ffi::NulError),
 }
@@ -97,7 +98,7 @@ impl Context {
     }
 
     /// Get text width for the given string
-    pub fn text_width<S: AsRef<str>>(&self, text: S) -> u64 {
+    pub fn text_width<S: AsRef<str>>(&self, text: S) -> Result<u64, XError> {
         get_text_width(&self, text)
     }
 }
@@ -120,8 +121,8 @@ impl Drop for Context {
 }
 
 /// Get the width of the text rendered with the font specified by the context
-pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
-    let text = CString::new(text.as_ref()).expect("Could not create CString");
+pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> Result<u64, XError> {
+    let text = CString::new(text.as_ref())?;
     unsafe {
         match ctx.data {
             Data::FontSet { fontset, .. } => {
@@ -133,10 +134,10 @@ pub fn get_text_width<S: AsRef<str>>(ctx: &Context, text: S) -> u64 {
                     ptr::null_mut(),
                     rectangle.as_mut_ptr(),
                 );
-                rectangle.assume_init().width as u64
+                Ok(rectangle.assume_init().width as u64)
             }
             Data::XFont { xfont, .. } => {
-                xlib::XTextWidth(xfont, text.as_ptr(), text.as_bytes().len() as i32) as u64
+                Ok(xlib::XTextWidth(xfont, text.as_ptr(), text.as_bytes().len() as i32) as u64)
             }
         }
     }
@@ -181,7 +182,7 @@ mod test {
     fn test_text_width() {
         setup();
         let ctx = Context::with_misc().unwrap();
-        assert!(get_text_width(&ctx, "Hello World") > 0);
+        assert!(get_text_width(&ctx, "Hello World").unwrap() > 0);
     }
     #[test]
     fn test_text_alternate() {
