@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::ptr;
@@ -11,8 +10,11 @@ pub enum XError {
     #[error("X Error: Could not open Display")]
     DisplayOpen,
 
-    #[error("X Error: Could not open load Font {0:?}")]
+    #[error("X Error: Could not load font with name {0:?}")]
     CouldNotLoadFont(CString),
+
+    #[error("CStrings cannot hold NUL values")]
+    NulError(#[from] std::ffi::NulError),
 }
 
 static_assertions::assert_impl_all!(XError: Sync, Send);
@@ -38,51 +40,59 @@ impl Context {
     ///
     /// The font string should be of the X11 form, as selected by `fontsel`.
     /// XFT is not supported!
-    pub fn new(name: &str) -> Result<Self, Box<dyn Error>> {
-        unsafe {
-            let name: CString = CString::new(name)?;
-            let dpy = xlib::XOpenDisplay(ptr::null());
-            if dpy.is_null() {
-                return Err(Box::new(XError::DisplayOpen));
-            }
-            let mut missing_ptr = MaybeUninit::uninit();
-            let mut missing_len = MaybeUninit::uninit();
-            let fontset = xlib::XCreateFontSet(
+    pub fn new(name: &str) -> Result<Self, XError> {
+        let name: CString = CString::new(name)?;
+        // SAFE because we simply call the
+        let dpy = unsafe { xlib::XOpenDisplay(ptr::null()) };
+        if dpy.is_null() {
+            return Err(XError::DisplayOpen);
+        }
+        let mut missing_ptr = MaybeUninit::uninit();
+        let mut missing_len = MaybeUninit::uninit();
+        // SAFE because values are correct
+        let fontset = unsafe {
+            xlib::XCreateFontSet(
                 dpy,
                 name.as_ptr(),
                 missing_ptr.as_mut_ptr(),
                 missing_len.as_mut_ptr(),
                 ptr::null_mut(),
-            );
+            )
+        };
+
+        // SAFE because XCreateFontSet always sets both ptrs to NULL or a valid value
+        unsafe {
             if !missing_ptr.assume_init().is_null() {
                 xlib::XFreeStringList(missing_ptr.assume_init());
             }
-            if !fontset.is_null() {
+        }
+        if !fontset.is_null() {
+            Ok(Context {
+                data: Data::FontSet {
+                    display: dpy,
+                    fontset,
+                },
+            })
+        } else {
+            // SAFE as both dpy and name are valid
+            let xfont = unsafe { xlib::XLoadQueryFont(dpy, name.as_ptr()) };
+            if xfont.is_null() {
+                // SAFE as dpy is a valid display
+                unsafe { xlib::XCloseDisplay(dpy) };
+                Err(XError::CouldNotLoadFont(name))
+            } else {
                 Ok(Context {
-                    data: Data::FontSet {
+                    data: Data::XFont {
                         display: dpy,
-                        fontset,
+                        xfont,
                     },
                 })
-            } else {
-                let xfont = xlib::XLoadQueryFont(dpy, name.as_ptr());
-                if xfont.is_null() {
-                    xlib::XCloseDisplay(dpy);
-                    Err(Box::new(XError::CouldNotLoadFont(name)))
-                } else {
-                    Ok(Context {
-                        data: Data::XFont {
-                            display: dpy,
-                            xfont,
-                        },
-                    })
-                }
             }
         }
     }
 
     /// Creates a new context with the misc-fixed font.
-    pub fn with_misc() -> Result<Self, Box<dyn Error>> {
+    pub fn with_misc() -> Result<Self, XError> {
         Self::new("-misc-fixed-*-*-*-*-*-*-*-*-*-*-*-*")
     }
 
