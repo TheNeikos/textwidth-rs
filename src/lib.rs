@@ -2,8 +2,8 @@ use std::error::Error;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::ptr;
-use x11::xlib;
 use thiserror::Error;
+use x11::xlib;
 
 /// XError holds the X11 error message
 #[derive(Debug, Error)]
@@ -14,6 +14,8 @@ pub enum XError {
     #[error("X Error: Could not open load Font {0:?}")]
     CouldNotLoadFont(CString),
 }
+
+static_assertions::assert_impl_all!(XError: Sync, Send);
 
 enum Data {
     FontSet {

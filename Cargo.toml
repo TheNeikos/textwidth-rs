@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 x11 = { version = "2.18.2", features = ["xlib"] }
 thiserror = "1"
+static_assertions = "1.1.0"
