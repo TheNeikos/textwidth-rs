@@ -7,13 +7,15 @@ use x11::xlib;
 /// XError holds the X11 error message
 #[derive(Debug, Error)]
 pub enum XError {
+    /// No X11 display found
     #[error("X Error: Could not open Display")]
     DisplayOpen,
 
+    /// The font could not be found
     #[error("X Error: Could not load font with name {0:?}")]
     CouldNotLoadFont(CString),
 
-    /// This error is returned when the string you pass 
+    /// This error is returned when the string you pass cannot be converted to a CString
     #[error("CStrings cannot hold NUL values")]
     NulError(#[from] std::ffi::NulError),
 }
